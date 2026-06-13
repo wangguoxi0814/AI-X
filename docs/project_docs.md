@@ -20,7 +20,10 @@
 ## 向量检索与知识库
 
 - **双域知识模型**：个人上下文知识与通用技术知识应逻辑分离，在检索、分类、权限上采用不同策略；通用知识抽取需通过 LLM 或规则做「去上下文抽象」。
-- **混合检索演进**：初期可仅向量相似度检索；规模增长后建议引入关键词（BM25）与向量融合的 Hybrid Search，提升专有名词与短查询的召回。
+- **存储分离**：结构化业务数据（Session、Message、KnowledgeEntry）存 MySQL；语义向量存 Milvus，通过 `externalId` 与业务 ID 双向关联。不将向量塞入关系库，便于 RAG 独立调优。
+- **AI 框架**：**Spring AI** 为唯一 AI / RAG 框架；Embedding、VectorStore（Milvus）、ChatClient、Document 切分、RAG Advisor 均通过 Spring AI 接入，不引入 LangChain4j。
+- **RAG 编排**：`EmbeddingModel` 向量化 → `VectorStore` 检索 → `RetrievalAugmentationAdvisor` 注入上下文 → `ChatClient` 生成；检索类 MCP Tool（`search_history`、`search_knowledge`）走 Retrieve → [Rerank] → 返回片段或合成回答。
+- **混合检索演进**：初期 Milvus 稠密向量检索；v1.1 引入 MySQL FULLTEXT 或 Elasticsearch BM25，与向量做 Hybrid Search，提升专有名词与短查询召回。
 - **去重与合并**：知识入库前对向量相似度做阈值去重，避免重复条目；保留 sourceRef 实现从知识条目回溯原始对话。
 
 ## 薄弱区与学习分析
@@ -31,9 +34,10 @@
 
 ## Java 后端工程实践
 
-- **模块化分层**：MCP 入口、领域服务、存储、向量、分析拆为独立模块，Embedding 提供商与向量库通过接口可插拔替换。
-- **持久层约定**：使用 MyBatis-Plus 时，实体字段通过 `@TableField` 映射，框架默认驼峰转下划线；业务 ID 与向量库中的 externalId 需双向关联。
-- **可观测性基线**：结构化日志携带 traceId、sessionId；暴露写入 QPS、embedding 队列深度、检索 P95 等指标及健康检查端点。
+- **运行时**：Java 21 LTS；Spring Boot 3.x + **Spring AI**。
+- **模块化分层**：MCP 入口、领域服务、存储（MySQL）、RAG（`ai-x-rag` / Spring AI）、分析拆为独立模块；模型与向量库通过 Spring AI Starter 可插拔切换。
+- **持久层约定**：使用 MyBatis-Plus 时，实体字段通过 `@TableField` 映射，框架默认驼峰转下划线；业务 ID 与 Milvus 中的 externalId 需双向关联。
+- **可观测性基线**：结构化日志携带 traceId、sessionId；暴露写入 QPS、embedding 队列深度、RAG retrieve/rerank P95 等指标及健康检查端点。
 
 ## 安全与部署
 
@@ -42,4 +46,4 @@
 
 ---
 
-*最后更新：2026-06-11*
+*最后更新：2026-06-13*
