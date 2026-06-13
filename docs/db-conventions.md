@@ -1,6 +1,6 @@
 # AI-X 数据库规范
 
-> 版本：v1.3  
+> 版本：v1.4  
 > 日期：2026-06-13  
 > 关联：[dev-conventions.md](./dev-conventions.md) §3.2
 
@@ -75,7 +75,7 @@
 ### 4.2 示例
 
 ```sql
-CREATE TABLE IF NOT EXISTS aix_example (
+CREATE TABLE IF NOT EXISTS chat_example (
     id              BIGINT        NOT NULL COMMENT '主键ID（雪花ID）',
     name            VARCHAR(128)  NOT NULL COMMENT '名称',
     deleted         TINYINT(1)    NOT NULL DEFAULT 0 COMMENT '逻辑删除：0-未删除 1-已删除',
@@ -91,17 +91,59 @@ CREATE TABLE IF NOT EXISTS aix_example (
 
 ## 5. 命名规范
 
+### 5.1 表名：业务域前缀 + 蛇形
+
+- 表名使用 **小写蛇形**（snake_case），**不要求**统一 `aix_` 前缀。
+- 使用 **业务域前缀** 区分不同子系统/模块；**同一业务域内前缀必须一致**。
+- 表名应能直接看出所属领域，避免跨域混用同一前缀。
+
+**本项目业务域前缀（约定）：**
+
+| 业务域 | 表前缀 | 说明 | 示例 |
+|--------|--------|------|------|
+| 对话采集 | `chat_` | 会话、消息、附件（规划） | `chat_session`、`chat_message` |
+| 知识库 | `kb_` | 知识条目、分类（规划） | `kb_entry` |
+| 分析 | `ana_` | 薄弱区报告、聚类快照（规划） | `ana_weak_area_report` |
+| 系统 | `sys_` | 用户、配置（规划） | `sys_user` |
+
+**禁止：**
+
+- 无域前缀的泛化表名（如单独 `session`、`message`）易冲突
+- 同一领域内混用不同前缀（如 `chat_session` 与 `aix_message` 并存）
+- 为了「项目名」强行所有表加 `aix_` 而无领域含义
+
+### 5.2 实体类名：与表名严格对应
+
+**规则：** Java 实体类名 = 表名的 **PascalCase（大驼峰）**，一一对应，**禁止**再加 `Entity` 等后缀。
+
+| 表名 | 实体类 | `@TableName` |
+|------|--------|--------------|
+| `chat_session` | `ChatSession` | `@TableName("chat_session")` |
+| `chat_message` | `ChatMessage` | `@TableName("chat_message")` |
+| `kb_entry` | `KbEntry` | `@TableName("kb_entry")` |
+
+转换：`{domain}_{name}` → 去掉下划线后每段首字母大写并拼接。
+
+**Mapper 命名：** `{实体类名}Mapper`，如 `ChatSessionMapper`、`ChatMessageMapper`。
+
+**禁止：**
+
+- 表 `chat_session` 对应类 `SessionEntity`（与表名不对应）
+- 实体类名与 `@TableName` 不一致
+- 一个实体映射多张表
+
+### 5.3 其它命名
+
 | 对象 | 规范 | 示例 |
 |------|------|------|
-| 表名 | `aix_` + 蛇形复数/业务名 | `aix_session`、`aix_message` |
 | 字段名 | 蛇形小写 | `client_message_id` |
 | 主键 | `id` BIGINT 雪花ID | 内部主键，`IdType.ASSIGN_ID` |
 | 业务唯一键 | `{业务}_id` + `UNIQUE KEY` | `session_id`、`message_id` |
-| 布尔/标志 | `TINYINT(1)`，不用 BOOLEAN 别名 | `deleted` |
+| 布尔/标志 | `TINYINT(1)` | `deleted` |
 | 时间 | `DATETIME(3)` | 毫秒精度 |
-| 大文本 | `TEXT` / `MEDIUMTEXT` / `LONGTEXT` | 对话正文可用 `LONGTEXT` |
+| 大文本 | `TEXT` / `MEDIUMTEXT` / `LONGTEXT` | 对话正文 |
 | JSON | `JSON` 类型 | `metadata_json` |
-| Java 实体 | `XxxEntity` 继承 `BaseEntity` | `SessionEntity` |
+| Java 实体基类 | 继承 `BaseEntity` | 审计字段不在子类重复声明 |
 
 ---
 
@@ -112,8 +154,8 @@ CREATE TABLE IF NOT EXISTS aix_example (
 所有业务实体 **必须** 继承 `com.aix.storage.entity.BaseEntity`，不得在各实体重复定义审计字段。
 
 ```java
-@TableName("aix_message")
-public class MessageEntity extends BaseEntity {
+@TableName("chat_message")
+public class ChatMessage extends BaseEntity {
     // 仅声明本表业务字段
 }
 ```
@@ -159,8 +201,8 @@ v1 默认操作人：`0L`（常量 `AuditConstants.SYSTEM_USER_ID`）。
 
 1. 在 `db/schema.sql` 或版本化迁移脚本编写 DDL（含 `id`、审计字段、全部 COMMENT）
 2. Code Review 对照 **§2 id**、**§3 审计字段**、**§4 COMMENT** 检查
-3. 新增 `XxxEntity extends BaseEntity`
-4. 新增 `XxxMapper extends BaseMapper<XxxEntity>`
+3. 新增实体类 `{TablePascalCase} extends BaseEntity`（类名与表名对应，无 `Entity` 后缀）
+4. 新增 `{Entity}Mapper extends BaseMapper<{Entity}>`
 5. 更新本文档 **§9 表清单**（如有新表）
 6. 禁止在 `ai-x-core` 或其它模块定义 Entity / Mapper
 
@@ -168,10 +210,10 @@ v1 默认操作人：`0L`（常量 `AuditConstants.SYSTEM_USER_ID`）。
 
 ## 9. 当前表清单
 
-| 表名 | 说明 |
-|------|------|
-| `aix_session` | AI 对话会话 |
-| `aix_message` | 会话消息（user/assistant） |
+| 表名 | 实体类 | 业务域 | 说明 |
+|------|--------|--------|------|
+| `chat_session` | `ChatSession` | 对话采集 | AI 对话会话 |
+| `chat_message` | `ChatMessage` | 对话采集 | 会话消息（user/assistant） |
 
 ---
 
@@ -181,6 +223,9 @@ v1 默认操作人：`0L`（常量 `AuditConstants.SYSTEM_USER_ID`）。
 - [ ] 是否包含 `deleted`、`create_user_id`、`create_time`、`update_user_id`、`update_time`
 - [ ] 每个字段是否有 `COMMENT`
 - [ ] 表是否有 `COMMENT='...'`
+- [ ] 表名是否使用正确的 **业务域前缀**（同域一致）
+- [ ] 实体类名是否为表名的 PascalCase，且 **无 `Entity` 后缀**
+- [ ] `@TableName` 是否与表名完全一致
 - [ ] 实体是否继承 `BaseEntity`
 - [ ] Mapper 是否仅在 `ai-x-storage`
 - [ ] 是否误用物理删除

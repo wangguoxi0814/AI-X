@@ -93,24 +93,24 @@
 
 | 子包 / 路径 | 存放内容 | 示例 |
 |-------------|----------|------|
-| `storage.entity` | MyBatis-Plus 实体，与表一一对应 | `SessionEntity`、`MessageEntity` |
-| `storage.mapper` | `BaseMapper` 接口 | `SessionMapper`、`MessageMapper` |
+| `storage.entity` | MyBatis-Plus 实体，类名与表名 PascalCase 对应 | `ChatSession`、`ChatMessage` |
+| `storage.mapper` | `BaseMapper` 接口 | `ChatSessionMapper`、`ChatMessageMapper` |
 | `resources/db/` | DDL、`schema.sql`、迁移脚本 | `schema.sql`、`V1__*.sql`（若引入 Flyway） |
 | `resources/mapper/` | 复杂 SQL 的 XML（按需） | `MessageMapper.xml` |
 
 **命名约定：**
 
-- 表名：`aix_` 前缀 + 蛇形，如 `aix_session`、`aix_message`
-- 实体：`XxxEntity extends BaseEntity`，禁止在各实体重复审计字段
-- Mapper：`XxxMapper`，与实体同名
+- 表名：业务域前缀 + 蛇形，见 [db-conventions.md](./db-conventions.md) §5（如 `chat_session`）
+- 实体：`ChatSession` 对应 `chat_session`，**禁止 `Entity` 后缀**
+- Mapper：`ChatSessionMapper`，与实体同名 + `Mapper`
 - **数据库规范（强制）：** 见 [db-conventions.md](./db-conventions.md) — 审计五字段、全字段 COMMENT、逻辑删除
 
 **新增表流程：**
 
 1. 按 [db-conventions.md](./db-conventions.md) 编写 DDL（含 COMMENT 与审计字段）
 2. 在 `resources/db/schema.sql`（或迁移脚本）提交
-3. 在 `storage.entity` 新增 `XxxEntity extends BaseEntity`
-4. 在 `storage.mapper` 新增 `XxxMapper`
+3. 在 `storage.entity` 新增 `{TablePascalCase} extends BaseEntity`（如 `ChatSession`）
+4. 在 `storage.mapper` 新增 `{Entity}Mapper`
 5. 在 `ai-x-core` 的 Service 中注入 Mapper 使用
 
 **禁止存放：**
@@ -316,9 +316,9 @@ ai-x-ingest/
 
 | 步骤 | 模块 | 文件 |
 |------|------|------|
-| 1 | `ai-x-storage` | `db/schema.sql` 增加 `aix_knowledge_entry` |
-| 2 | `ai-x-storage` | `entity/KnowledgeEntryEntity.java` |
-| 3 | `ai-x-storage` | `mapper/KnowledgeEntryMapper.java` |
+| 1 | `ai-x-storage` | `db/schema.sql` 增加 `kb_entry` |
+| 2 | `ai-x-storage` | `entity/KbEntry.java` |
+| 3 | `ai-x-storage` | `mapper/KbEntryMapper.java` |
 | 4 | `ai-x-core` | `service/KnowledgeService.java` + `Impl` |
 | 5 | `ai-x-rag` | 长文分块 + `VectorStore.add`（若需检索） |
 | 6 | `ai-x-mcp-server` | `tool/AddKnowledgeTool.java` |
@@ -342,7 +342,7 @@ ai-x-ingest/
 |------|------|
 | Java 版本 | 21；优先 `record` 作不可变 DTO |
 | 包名 | 全小写，`com.aix.{模块}.{层}` |
-| 类名 | 大驼峰；Entity 后缀 `Entity`，Mapper 后缀 `Mapper` |
+| 类名 | 大驼峰，与表名 PascalCase 对应；Mapper 后缀 `Mapper` |
 | 表字段 | 蛇形；Java 驼峰 + `@TableField` 映射 |
 | 配置键 | `aix.{域}.{项}` 或 `spring.ai.*` |
 | 日志 | SLF4J；关键路径带 `sessionId` / `messageId` |

@@ -415,7 +415,7 @@ Hook 调用 API
 - [ ] Hook 脚本可执行（Windows：PowerShell 执行策略 / Python 在 PATH）
 - [ ] `AIX_INGEST_TOKEN` 在 Hook 环境与 AI-X 配置一致
 - [ ] Cursor **Hooks** 设置页或 Hooks 输出通道可见执行日志
-- [ ] 发送测试消息后，MySQL `message` 表有新记录
+- [ ] 发送测试消息后，MySQL `chat_message` 表有新记录
 
 ---
 
