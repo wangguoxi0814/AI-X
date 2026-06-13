@@ -1,7 +1,7 @@
 # AI-X 智能对话知识沉淀系统
 基于完整采集用户和LLM对话数据，通过AI智能分析完整对话数据、对用户生成知识反馈报告，用于快速复盘和知识沉淀。
 
-> **当前状态：** 设计阶段（文档已就绪，代码待实现）
+> **当前状态：** M1 基础骨架已搭建（Ingestion REST + Hooks 模板），RAG / MCP 待实现
 
 ---
 
@@ -100,40 +100,52 @@ Hook 在 Agent 生命周期事件（`beforeSubmitPrompt`、`afterAgentResponse` 
 
 ---
 
-## 模块结构（规划）
+## 模块结构
 
 ```
-ai-x/
-├── ai-x-mcp-server      # MCP 协议入口
-├── ai-x-core            # 领域服务
-├── ai-x-storage         # MyBatis-Plus（MySQL）
-├── ai-x-rag             # Spring AI：Embedding、VectorStore、RAG Pipeline
-├── ai-x-analysis        # 薄弱区、聚类、报告
-├── ai-x-api             # REST 接口（含 Ingestion）
-├── ai-x-ingest          # Cursor Hooks 脚本与安装模板（分发给集成方）
-└── ai-x-common          # 公共工具与配置
+AI-X/
+├── pom.xml
+├── ai-x-api/                  # Spring Boot 启动入口、Ingestion REST
+├── ai-x-core/                 # ChatRecordService 等领域服务
+├── ai-x-storage/              # MyBatis-Plus 实体、Mapper、schema.sql
+├── ai-x-rag/                  # Spring AI 占位（M2）
+├── ai-x-analysis/             # 薄弱区分析占位（M4）
+├── ai-x-mcp-server/           # MCP Server 占位（M1）
+├── ai-x-common/               # ApiResponse、异常、IngestProperties
+├── ai-x-ingest/               # Cursor Hooks 模板（复制到业务项目）
+│   └── template/.cursor/
+└── docs/
 ```
 
 ---
 
 ## 快速开始
 
-> 代码尚未实现，以下为预期启动流程。
-
-**前置依赖：** JDK 21、MySQL 8.x、Milvus 2.x、Redis、Ollama（或 OpenAI API Key）
+**前置依赖：** JDK 21、MySQL 8.x
 
 ```bash
-# 1. 启动基础设施（Docker Compose 待提供）
-# MySQL + Milvus + Redis
+# 1. 初始化数据库
+mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS aix"
+mysql -u root -p < ai-x-storage/src/main/resources/db/schema.sql
 
-# 2. 配置 application.yml
-# spring.ai.model.embedding / spring.ai.vectorstore.milvus.host 等
+# 2. 编译
+mvn compile -DskipTests
 
-# 3. 启动 AI-X 服务
+# 3. 启动（配置 MySQL 密码与 Ingest Token）
+set AIX_MYSQL_PASSWORD=your_password
+set AIX_INGEST_TOKEN=your-token
 mvn spring-boot:run -pl ai-x-api
-
-# 4. 在业务项目中安装 Cursor Hooks（见 ai-x-ingest 文档）
 ```
+
+**安装 Cursor Hooks（在业务项目中）：**
+
+```powershell
+Copy-Item -Recurse -Force ai-x-ingest\template\.cursor .cursor
+$env:AIX_API_BASE = "http://127.0.0.1:8080"
+$env:AIX_INGEST_TOKEN = "your-token"
+```
+
+验证：`GET http://127.0.0.1:8080/api/health`
 
 ---
 
@@ -141,6 +153,8 @@ mvn spring-boot:run -pl ai-x-api
 
 | 文档 | 内容 |
 |------|------|
+| [docs/db-conventions.md](docs/db-conventions.md) | **数据库规范**：审计字段、COMMENT、逻辑删除 |
+| [docs/dev-conventions.md](docs/dev-conventions.md) | **开发规范**：模块职责、代码存放位置、依赖规则 |
 | [docs/requirements.md](docs/requirements.md) | 功能需求、数据模型、Spring AI 架构、里程碑 |
 | [docs/cursor-hooks-tech-options.md](docs/cursor-hooks-tech-options.md) | Cursor Hooks 采集方案、REST API、部署与联调 |
 | [docs/project_docs.md](docs/project_docs.md) | MCP 协议、RAG、工程实践沉淀 |
