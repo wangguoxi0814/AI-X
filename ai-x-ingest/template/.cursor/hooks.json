@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "command": ".cursor/hooks/aix-ingest.ps1",
+        "timeout": 3
+      }
+    ],
+    "beforeSubmitPrompt": [
+      {
+        "command": ".cursor/hooks/aix-ingest.ps1",
+        "timeout": 3
+      }
+    ],
+    "afterAgentResponse": [
+      {
+        "command": ".cursor/hooks/aix-ingest.ps1",
+        "timeout": 3
+      }
+    ],
+    "stop": [
+      {
+        "command": ".cursor/hooks/aix-ingest.ps1",
+        "timeout": 5
+      }
+    ]
+  }
+}

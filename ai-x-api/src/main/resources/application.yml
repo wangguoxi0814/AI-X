@@ -1,0 +1,38 @@
+server:
+  port: ${AIX_PORT:8080}
+  address: ${AIX_BIND_ADDRESS:127.0.0.1}
+
+spring:
+  application:
+    name: ai-x
+  datasource:
+    url: jdbc:mysql://${AIX_MYSQL_HOST:127.0.0.1}:${AIX_MYSQL_PORT:3306}/${AIX_MYSQL_DB:aix}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: ${AIX_MYSQL_USER:root}
+    password: ${AIX_MYSQL_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: assign_uuid
+
+aix:
+  ingest:
+    enabled: true
+    auth-token: ${AIX_INGEST_TOKEN:}
+    bind-address: ${AIX_BIND_ADDRESS:127.0.0.1}
+    port: ${AIX_PORT:8080}
+  rag:
+    enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  level:
+    com.aix: INFO
