@@ -1,16 +1,14 @@
 package com.aix.storage.entity;
 
-import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 
 import java.time.LocalDateTime;
 
 @TableName("aix_session")
-public class SessionEntity {
+public class SessionEntity extends BaseEntity {
 
-    @TableId(value = "session_id", type = IdType.INPUT)
+    @TableField("session_id")
     private String sessionId;
 
     private String title;

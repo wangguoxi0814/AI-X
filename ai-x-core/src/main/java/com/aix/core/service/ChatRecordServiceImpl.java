@@ -22,6 +22,7 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 @Service
 public class ChatRecordServiceImpl implements ChatRecordService {
@@ -45,7 +46,7 @@ public class ChatRecordServiceImpl implements ChatRecordService {
     public IngestResult startSession(CreateSessionRequest request) {
         validateSessionId(request.sessionId());
 
-        SessionEntity existing = sessionMapper.selectById(request.sessionId());
+        SessionEntity existing = findSessionBySessionId(request.sessionId());
         if (existing != null) {
             return new IngestResult(ApiCode.OK, null, existing.getSessionId(), true);
         }
@@ -85,13 +86,13 @@ public class ChatRecordServiceImpl implements ChatRecordService {
         }
 
         MessageEntity message = new MessageEntity();
+        message.setMessageId(UUID.randomUUID().toString());
         message.setSessionId(request.sessionId());
         message.setRole(request.role());
         message.setContent(request.content());
         message.setClientMessageId(request.clientMessageId());
         message.setSeq(nextSeq(request.sessionId()));
         message.setMetadataJson(toJson(request.metadata()));
-        message.setCreatedAt(LocalDateTime.now());
         messageMapper.insert(message);
 
         if ("user".equalsIgnoreCase(request.role())) {
@@ -107,7 +108,7 @@ public class ChatRecordServiceImpl implements ChatRecordService {
     public IngestResult endSession(String sessionId) {
         validateSessionId(sessionId);
 
-        SessionEntity session = sessionMapper.selectById(sessionId);
+        SessionEntity session = findSessionBySessionId(sessionId);
         if (session == null) {
             throw new AixException(ApiCode.SESSION_NOT_FOUND, "session not found: " + sessionId);
         }
@@ -126,10 +127,17 @@ public class ChatRecordServiceImpl implements ChatRecordService {
     }
 
     private void ensureSessionExists(String sessionId) {
-        if (sessionMapper.selectById(sessionId) != null) {
+        if (findSessionBySessionId(sessionId) != null) {
             return;
         }
         startSession(new CreateSessionRequest(sessionId, null, "cursor", null, Map.of("autoCreated", true)));
+    }
+
+    private SessionEntity findSessionBySessionId(String sessionId) {
+        return sessionMapper.selectOne(
+                Wrappers.<SessionEntity>lambdaQuery()
+                        .eq(SessionEntity::getSessionId, sessionId)
+        );
     }
 
     private int nextSeq(String sessionId) {

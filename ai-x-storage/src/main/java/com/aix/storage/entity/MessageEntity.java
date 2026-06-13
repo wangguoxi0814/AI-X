@@ -1,16 +1,12 @@
 package com.aix.storage.entity;
 
-import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 
-import java.time.LocalDateTime;
-
 @TableName("aix_message")
-public class MessageEntity {
+public class MessageEntity extends BaseEntity {
 
-    @TableId(value = "message_id", type = IdType.ASSIGN_UUID)
+    @TableField("message_id")
     private String messageId;
 
     private String sessionId;
@@ -26,8 +22,6 @@ public class MessageEntity {
 
     @TableField("metadata_json")
     private String metadataJson;
-
-    private LocalDateTime createdAt;
 
     public String getMessageId() {
         return messageId;
@@ -83,13 +77,5 @@ public class MessageEntity {
 
     public void setMetadataJson(String metadataJson) {
         this.metadataJson = metadataJson;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
     }
 }
