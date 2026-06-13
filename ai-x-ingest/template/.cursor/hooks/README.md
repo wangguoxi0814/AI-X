@@ -41,4 +41,4 @@ macOS / Linux 可将 `hooks.json` 中的 command 改为：
 
 1. AI-X 已启动：`GET /api/health` 返回 200
 2. Token 与服务端 `AIX_INGEST_TOKEN` 一致
-3. 发送测试消息后 MySQL `aix_message` 表有新记录
+3. 发送测试消息后 MySQL `chat_message` 表有新记录
