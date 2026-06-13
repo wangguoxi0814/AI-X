@@ -101,8 +101,17 @@
 **命名约定：**
 
 - 表名：`aix_` 前缀 + 蛇形，如 `aix_session`、`aix_message`
-- 实体：`XxxEntity`，禁止 `@TableName` 以外的表名硬编码在 Service 中
+- 实体：`XxxEntity extends BaseEntity`，禁止在各实体重复审计字段
 - Mapper：`XxxMapper`，与实体同名
+- **数据库规范（强制）：** 见 [db-conventions.md](./db-conventions.md) — 审计五字段、全字段 COMMENT、逻辑删除
+
+**新增表流程：**
+
+1. 按 [db-conventions.md](./db-conventions.md) 编写 DDL（含 COMMENT 与审计字段）
+2. 在 `resources/db/schema.sql`（或迁移脚本）提交
+3. 在 `storage.entity` 新增 `XxxEntity extends BaseEntity`
+4. 在 `storage.mapper` 新增 `XxxMapper`
+5. 在 `ai-x-core` 的 Service 中注入 Mapper 使用
 
 **禁止存放：**
 
@@ -110,13 +119,6 @@
 - REST / MCP 接口
 - 事务编排（放在 `ai-x-core`）
 - 向量库（Milvus）访问代码
-
-**新增表流程：**
-
-1. 在 `resources/db/schema.sql`（或迁移脚本）增加 DDL  
-2. 在 `storage.entity` 新增 `XxxEntity`  
-3. 在 `storage.mapper` 新增 `XxxMapper`  
-4. 在 `ai-x-core` 的 Service 中注入 Mapper 使用  
 
 ---
 
@@ -383,6 +385,7 @@ ai-x-ingest/
 
 **相关文档：**
 
+- [db-conventions.md](./db-conventions.md) — 数据库表结构、审计字段、COMMENT 规范
 - [requirements.md](./requirements.md) — 功能与非功能需求
 - [cursor-hooks-tech-options.md](./cursor-hooks-tech-options.md) — Hooks 采集方案
 - [project_docs.md](./project_docs.md) — 技术沉淀
