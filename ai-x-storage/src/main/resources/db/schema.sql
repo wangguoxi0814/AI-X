@@ -1,3 +1,5 @@
+USE AIX
+
 CREATE TABLE IF NOT EXISTS aix_session (
     session_id   VARCHAR(64)  PRIMARY KEY,
     title        VARCHAR(512),
