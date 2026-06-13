@@ -9,3 +9,13 @@
 /dataSources.local.xml
 !.idea/workspace.xml
 .idea/
+
+# Maven
+target/
+
+# Local env
+.env
+.env.local
+
+# Hook dead-letter (v1.1)
+**/.cursor/hooks/dead-letter.jsonl
