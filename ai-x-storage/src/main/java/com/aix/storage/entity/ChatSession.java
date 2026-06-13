@@ -5,8 +5,8 @@ import com.baomidou.mybatisplus.annotation.TableName;
 
 import java.time.LocalDateTime;
 
-@TableName("aix_session")
-public class SessionEntity extends BaseEntity {
+@TableName("chat_session")
+public class ChatSession extends BaseEntity {
 
     @TableField("session_id")
     private String sessionId;

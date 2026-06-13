@@ -5,10 +5,10 @@ import com.aix.common.model.ApiCode;
 import com.aix.core.dto.CreateSessionRequest;
 import com.aix.core.dto.IngestResult;
 import com.aix.core.dto.RecordMessageRequest;
-import com.aix.storage.entity.MessageEntity;
-import com.aix.storage.entity.SessionEntity;
-import com.aix.storage.mapper.MessageMapper;
-import com.aix.storage.mapper.SessionMapper;
+import com.aix.storage.entity.ChatMessage;
+import com.aix.storage.entity.ChatSession;
+import com.aix.storage.mapper.ChatMessageMapper;
+import com.aix.storage.mapper.ChatSessionMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -29,15 +29,15 @@ public class ChatRecordServiceImpl implements ChatRecordService {
 
     private static final Logger log = LoggerFactory.getLogger(ChatRecordServiceImpl.class);
 
-    private final SessionMapper sessionMapper;
-    private final MessageMapper messageMapper;
+    private final ChatSessionMapper chatSessionMapper;
+    private final ChatMessageMapper chatMessageMapper;
     private final ObjectMapper objectMapper;
 
-    public ChatRecordServiceImpl(SessionMapper sessionMapper,
-                                 MessageMapper messageMapper,
+    public ChatRecordServiceImpl(ChatSessionMapper chatSessionMapper,
+                                 ChatMessageMapper chatMessageMapper,
                                  ObjectMapper objectMapper) {
-        this.sessionMapper = sessionMapper;
-        this.messageMapper = messageMapper;
+        this.chatSessionMapper = chatSessionMapper;
+        this.chatMessageMapper = chatMessageMapper;
         this.objectMapper = objectMapper;
     }
 
@@ -46,19 +46,19 @@ public class ChatRecordServiceImpl implements ChatRecordService {
     public IngestResult startSession(CreateSessionRequest request) {
         validateSessionId(request.sessionId());
 
-        SessionEntity existing = findSessionBySessionId(request.sessionId());
+        ChatSession existing = findSessionBySessionId(request.sessionId());
         if (existing != null) {
             return new IngestResult(ApiCode.OK, null, existing.getSessionId(), true);
         }
 
-        SessionEntity session = new SessionEntity();
+        ChatSession session = new ChatSession();
         session.setSessionId(request.sessionId());
         session.setTitle(request.title());
         session.setSource(StringUtils.hasText(request.source()) ? request.source() : "cursor");
         session.setStatus("active");
         session.setMetadataJson(toJson(mergeMetadata(request.metadata(), request.tags())));
         session.setStartedAt(LocalDateTime.now());
-        sessionMapper.insert(session);
+        chatSessionMapper.insert(session);
 
         return new IngestResult(ApiCode.OK, null, session.getSessionId(), false);
     }
@@ -76,16 +76,16 @@ public class ChatRecordServiceImpl implements ChatRecordService {
 
         ensureSessionExists(request.sessionId());
 
-        MessageEntity duplicate = messageMapper.selectOne(
-                Wrappers.<MessageEntity>lambdaQuery()
-                        .eq(MessageEntity::getSessionId, request.sessionId())
-                        .eq(MessageEntity::getClientMessageId, request.clientMessageId())
+        ChatMessage duplicate = chatMessageMapper.selectOne(
+                Wrappers.<ChatMessage>lambdaQuery()
+                        .eq(ChatMessage::getSessionId, request.sessionId())
+                        .eq(ChatMessage::getClientMessageId, request.clientMessageId())
         );
         if (duplicate != null) {
             return new IngestResult(ApiCode.DUPLICATE_MESSAGE, duplicate.getMessageId(), request.sessionId(), true);
         }
 
-        MessageEntity message = new MessageEntity();
+        ChatMessage message = new ChatMessage();
         message.setMessageId(UUID.randomUUID().toString());
         message.setSessionId(request.sessionId());
         message.setRole(request.role());
@@ -93,7 +93,7 @@ public class ChatRecordServiceImpl implements ChatRecordService {
         message.setClientMessageId(request.clientMessageId());
         message.setSeq(nextSeq(request.sessionId()));
         message.setMetadataJson(toJson(request.metadata()));
-        messageMapper.insert(message);
+        chatMessageMapper.insert(message);
 
         if ("user".equalsIgnoreCase(request.role())) {
             log.debug("enqueue embedding for messageId={}", message.getMessageId());
@@ -108,7 +108,7 @@ public class ChatRecordServiceImpl implements ChatRecordService {
     public IngestResult endSession(String sessionId) {
         validateSessionId(sessionId);
 
-        SessionEntity session = findSessionBySessionId(sessionId);
+        ChatSession session = findSessionBySessionId(sessionId);
         if (session == null) {
             throw new AixException(ApiCode.SESSION_NOT_FOUND, "session not found: " + sessionId);
         }
@@ -118,7 +118,7 @@ public class ChatRecordServiceImpl implements ChatRecordService {
 
         session.setStatus("ended");
         session.setEndedAt(LocalDateTime.now());
-        sessionMapper.updateById(session);
+        chatSessionMapper.updateById(session);
 
         log.debug("session ended, trigger summary/extract for sessionId={}", sessionId);
         // TODO(M3): end_session summary and knowledge extraction via Spring AI ChatClient
@@ -133,19 +133,19 @@ public class ChatRecordServiceImpl implements ChatRecordService {
         startSession(new CreateSessionRequest(sessionId, null, "cursor", null, Map.of("autoCreated", true)));
     }
 
-    private SessionEntity findSessionBySessionId(String sessionId) {
-        return sessionMapper.selectOne(
-                Wrappers.<SessionEntity>lambdaQuery()
-                        .eq(SessionEntity::getSessionId, sessionId)
+    private ChatSession findSessionBySessionId(String sessionId) {
+        return chatSessionMapper.selectOne(
+                Wrappers.<ChatSession>lambdaQuery()
+                        .eq(ChatSession::getSessionId, sessionId)
         );
     }
 
     private int nextSeq(String sessionId) {
-        LambdaQueryWrapper<MessageEntity> wrapper = Wrappers.<MessageEntity>lambdaQuery()
-                .eq(MessageEntity::getSessionId, sessionId)
-                .orderByDesc(MessageEntity::getSeq)
+        LambdaQueryWrapper<ChatMessage> wrapper = Wrappers.<ChatMessage>lambdaQuery()
+                .eq(ChatMessage::getSessionId, sessionId)
+                .orderByDesc(ChatMessage::getSeq)
                 .last("LIMIT 1");
-        MessageEntity latest = messageMapper.selectOne(wrapper);
+        ChatMessage latest = chatMessageMapper.selectOne(wrapper);
         return latest == null ? 1 : latest.getSeq() + 1;
     }
 

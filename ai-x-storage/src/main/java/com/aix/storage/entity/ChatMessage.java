@@ -3,8 +3,8 @@ package com.aix.storage.entity;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 
-@TableName("aix_message")
-public class MessageEntity extends BaseEntity {
+@TableName("chat_message")
+public class ChatMessage extends BaseEntity {
 
     @TableField("message_id")
     private String messageId;
