@@ -3,6 +3,7 @@ package com.aix.core.service;
 import com.aix.common.exception.AixException;
 import com.aix.common.model.ApiCode;
 import com.aix.common.model.CursorHookEvent;
+import com.aix.common.model.MessageType;
 import com.aix.core.dto.CreateSessionRequest;
 import com.aix.core.dto.IngestResult;
 import com.aix.core.dto.RecordMessageRequest;
@@ -59,8 +60,12 @@ public class ChatRecordServiceImpl implements ChatRecordService {
     @Transactional
     public IngestResult recordMessage(RecordMessageRequest request) {
         validateSessionId(request.sessionId());
-        if (!StringUtils.hasText(request.role())) {
-            throw new AixException(ApiCode.INVALID_ARGUMENT, "role 角色不能为空，应为 user 或 assistant");
+        if (request.messageType() == null) {
+            throw new AixException(ApiCode.INVALID_ARGUMENT, "messageType 消息类型不能为空");
+        }
+        MessageType messageType = MessageType.fromCode(request.messageType());
+        if (messageType == MessageType.UNKNOWN) {
+            throw new AixException(ApiCode.INVALID_ARGUMENT, "unknown messageType code: " + request.messageType());
         }
         if (!StringUtils.hasText(request.content())) {
             throw new AixException(ApiCode.INVALID_ARGUMENT, "content 消息正文不能为空");
@@ -91,14 +96,14 @@ public class ChatRecordServiceImpl implements ChatRecordService {
         ChatMessage message = new ChatMessage();
         message.setMessageId(request.messageId());
         message.setSessionId(request.sessionId());
-        message.setRole(request.role());
+        message.setMessageType(messageType.getCode());
         message.setContent(request.content());
         message.setEvent(request.event());
         message.setSeq(nextSeq(request.sessionId()));
         message.setMetadataJson(toJson(request.metadata()));
         chatMessageMapper.insert(message);
 
-        if ("user".equalsIgnoreCase(request.role())) {
+        if (messageType == MessageType.USER) {
             log.debug("enqueue embedding for messageId={}", message.getMessageId());
             // TODO(M2): Spring AI EmbeddingModel + VectorStore async indexing
         }

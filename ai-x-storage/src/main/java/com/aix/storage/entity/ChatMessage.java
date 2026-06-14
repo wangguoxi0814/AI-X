@@ -16,7 +16,9 @@ public class ChatMessage extends BaseEntity {
 
     private String sessionId;
 
-    private String role;
+    /** 消息类型码，见 {@link com.aix.common.model.MessageType} */
+    @TableField("message_type")
+    private Integer messageType;
 
     private String content;
 

@@ -46,10 +46,10 @@ public class IngestController {
     @PostMapping("/messages")
     public IngestResponse recordMessage(@Valid @RequestBody RecordMessageBody body) {
         log.info(
-                "ingest message sessionId={} messageId={} role={} event={} contentLen={} content={}",
+                "ingest message sessionId={} messageId={} messageType={} event={} contentLen={} content={}",
                 body.sessionId(),
                 body.messageId(),
-                body.role(),
+                body.messageType(),
                 body.event(),
                 body.content() == null ? 0 : body.content().length(),
                 body.content()
@@ -57,7 +57,7 @@ public class IngestController {
         IngestResult result = chatRecordService.recordMessage(
                 new RecordMessageRequest(
                         body.sessionId(),
-                        body.role(),
+                        body.messageType(),
                         body.content(),
                         body.messageId(),
                         body.event(),
@@ -95,8 +95,8 @@ public class IngestController {
     public record RecordMessageBody(
             @NotBlank(message = "sessionId 会话 ID 不能为空")
             String sessionId,
-            @NotBlank(message = "role 角色不能为空，应为 user 或 assistant")
-            String role,
+            @NotNull(message = "messageType 消息类型不能为空，1-user 2-assistant 3-thought 4-system")
+            Integer messageType,
             @NotBlank(message = "content 消息正文不能为空")
             String content,
             @NotBlank(message = "messageId 消息 ID 不能为空")

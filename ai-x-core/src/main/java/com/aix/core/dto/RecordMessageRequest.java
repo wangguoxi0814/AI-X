@@ -4,7 +4,7 @@ import java.util.Map;
 
 public record RecordMessageRequest(
         String sessionId,
-        String role,
+        Integer messageType,
         String content,
         String messageId,
         Integer event,
