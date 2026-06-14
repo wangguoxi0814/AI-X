@@ -59,14 +59,17 @@ public class ChatRecordServiceImpl implements ChatRecordService {
     @Transactional
     public IngestResult recordMessage(RecordMessageRequest request) {
         validateSessionId(request.sessionId());
-        if (!StringUtils.hasText(request.role()) || !StringUtils.hasText(request.content())) {
-            throw new AixException(ApiCode.INVALID_ARGUMENT, "role and content are required");
+        if (!StringUtils.hasText(request.role())) {
+            throw new AixException(ApiCode.INVALID_ARGUMENT, "role 角色不能为空，应为 user 或 assistant");
+        }
+        if (!StringUtils.hasText(request.content())) {
+            throw new AixException(ApiCode.INVALID_ARGUMENT, "content 消息正文不能为空");
         }
         if (!StringUtils.hasText(request.messageId())) {
-            throw new AixException(ApiCode.INVALID_ARGUMENT, "messageId is required");
+            throw new AixException(ApiCode.INVALID_ARGUMENT, "messageId 消息 ID 不能为空");
         }
         if (request.event() == null) {
-            throw new AixException(ApiCode.INVALID_ARGUMENT, "event is required");
+            throw new AixException(ApiCode.INVALID_ARGUMENT, "event 钩子事件码不能为空");
         }
         CursorHookEvent hookEvent = CursorHookEvent.fromCode(request.event());
         if (hookEvent == CursorHookEvent.UNKNOWN) {
@@ -151,7 +154,7 @@ public class ChatRecordServiceImpl implements ChatRecordService {
 
     private void validateSessionId(String sessionId) {
         if (!StringUtils.hasText(sessionId)) {
-            throw new AixException(ApiCode.INVALID_ARGUMENT, "sessionId is required");
+            throw new AixException(ApiCode.INVALID_ARGUMENT, "sessionId 会话 ID 不能为空");
         }
     }
 
@@ -170,7 +173,7 @@ public class ChatRecordServiceImpl implements ChatRecordService {
         try {
             return objectMapper.writeValueAsString(metadata);
         } catch (JsonProcessingException e) {
-            throw new AixException(ApiCode.INVALID_ARGUMENT, "invalid metadata json");
+            throw new AixException(ApiCode.INVALID_ARGUMENT, "metadata 不是合法 JSON");
         }
     }
 }

@@ -8,6 +8,7 @@ import com.aix.core.service.ChatRecordService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -19,6 +20,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/ingest")
+@Slf4j
 public class IngestController {
 
     private final ChatRecordService chatRecordService;
@@ -43,6 +45,15 @@ public class IngestController {
 
     @PostMapping("/messages")
     public IngestResponse recordMessage(@Valid @RequestBody RecordMessageBody body) {
+        log.info(
+                "ingest message sessionId={} messageId={} role={} event={} contentLen={} content={}",
+                body.sessionId(),
+                body.messageId(),
+                body.role(),
+                body.event(),
+                body.content() == null ? 0 : body.content().length(),
+                body.content()
+        );
         IngestResult result = chatRecordService.recordMessage(
                 new RecordMessageRequest(
                         body.sessionId(),
@@ -72,7 +83,8 @@ public class IngestController {
     }
 
     public record StartSessionBody(
-            @NotBlank String sessionId,
+            @NotBlank(message = "sessionId 会话 ID 不能为空")
+            String sessionId,
             String title,
             String source,
             List<String> tags,
@@ -81,11 +93,16 @@ public class IngestController {
     }
 
     public record RecordMessageBody(
-            @NotBlank String sessionId,
-            @NotBlank String role,
-            @NotBlank String content,
-            @NotBlank String messageId,
-            @NotNull Integer event,
+            @NotBlank(message = "sessionId 会话 ID 不能为空")
+            String sessionId,
+            @NotBlank(message = "role 角色不能为空，应为 user 或 assistant")
+            String role,
+            @NotBlank(message = "content 消息正文不能为空")
+            String content,
+            @NotBlank(message = "messageId 消息 ID 不能为空")
+            String messageId,
+            @NotNull(message = "event 钩子事件码不能为空")
+            Integer event,
             Map<String, Object> metadata
     ) {
     }
