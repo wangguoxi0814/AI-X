@@ -19,3 +19,4 @@ target/
 
 # Hook dead-letter (v1.1)
 **/.cursor/hooks/dead-letter.jsonl
+.cursor/
