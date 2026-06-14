@@ -80,7 +80,7 @@ your-company-project/
 │   ├── hooks.json
 │   └── hooks/
 │       ├── aix_ingest.py
-│       └── aix-ingest.ps1
+│       └── README.md
 └── src/...
 ```
 
@@ -128,7 +128,6 @@ AI-X/
 
 ```bash
 # 1. 初始化数据库
-mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS aix"
 mysql -u root -p < ai-x-storage/src/main/resources/db/schema.sql
 
 # 2. 编译
