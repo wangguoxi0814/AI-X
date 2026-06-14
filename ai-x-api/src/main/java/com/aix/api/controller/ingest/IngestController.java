@@ -7,6 +7,7 @@ import com.aix.core.dto.RecordMessageRequest;
 import com.aix.core.service.ChatRecordService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -47,7 +48,8 @@ public class IngestController {
                         body.sessionId(),
                         body.role(),
                         body.content(),
-                        body.clientMessageId(),
+                        body.messageId(),
+                        body.event(),
                         body.metadata()
                 )
         );
@@ -82,7 +84,8 @@ public class IngestController {
             @NotBlank String sessionId,
             @NotBlank String role,
             @NotBlank String content,
-            @NotBlank String clientMessageId,
+            @NotBlank String messageId,
+            @NotNull Integer event,
             Map<String, Object> metadata
     ) {
     }

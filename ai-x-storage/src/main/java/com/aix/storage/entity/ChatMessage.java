@@ -10,6 +10,7 @@ import lombok.Setter;
 @TableName("chat_message")
 public class ChatMessage extends BaseEntity {
 
+    /** 客户端消息 ID */
     @TableField("message_id")
     private String messageId;
 
@@ -21,8 +22,8 @@ public class ChatMessage extends BaseEntity {
 
     private Integer seq;
 
-    @TableField("client_message_id")
-    private String clientMessageId;
+    /** Cursor Hook 事件码，见 {@link com.aix.common.model.CursorHookEvent} */
+    private Integer event;
 
     @TableField("metadata_json")
     private String metadataJson;

@@ -6,7 +6,8 @@ public record RecordMessageRequest(
         String sessionId,
         String role,
         String content,
-        String clientMessageId,
+        String messageId,
+        Integer event,
         Map<String, Object> metadata
 ) {
 }

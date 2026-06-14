@@ -2,6 +2,7 @@ package com.aix.core.service;
 
 import com.aix.common.exception.AixException;
 import com.aix.common.model.ApiCode;
+import com.aix.common.model.CursorHookEvent;
 import com.aix.core.dto.CreateSessionRequest;
 import com.aix.core.dto.IngestResult;
 import com.aix.core.dto.RecordMessageRequest;
@@ -22,7 +23,6 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 
 @Slf4j
 @Service
@@ -62,8 +62,15 @@ public class ChatRecordServiceImpl implements ChatRecordService {
         if (!StringUtils.hasText(request.role()) || !StringUtils.hasText(request.content())) {
             throw new AixException(ApiCode.INVALID_ARGUMENT, "role and content are required");
         }
-        if (!StringUtils.hasText(request.clientMessageId())) {
-            throw new AixException(ApiCode.INVALID_ARGUMENT, "clientMessageId is required");
+        if (!StringUtils.hasText(request.messageId())) {
+            throw new AixException(ApiCode.INVALID_ARGUMENT, "messageId is required");
+        }
+        if (request.event() == null) {
+            throw new AixException(ApiCode.INVALID_ARGUMENT, "event is required");
+        }
+        CursorHookEvent hookEvent = CursorHookEvent.fromCode(request.event());
+        if (hookEvent == CursorHookEvent.UNKNOWN) {
+            throw new AixException(ApiCode.INVALID_ARGUMENT, "unknown hook event code: " + request.event());
         }
 
         ensureSessionExists(request.sessionId());
@@ -71,18 +78,19 @@ public class ChatRecordServiceImpl implements ChatRecordService {
         ChatMessage duplicate = chatMessageMapper.selectOne(
                 Wrappers.<ChatMessage>lambdaQuery()
                         .eq(ChatMessage::getSessionId, request.sessionId())
-                        .eq(ChatMessage::getClientMessageId, request.clientMessageId())
+                        .eq(ChatMessage::getMessageId, request.messageId())
+                        .eq(ChatMessage::getEvent, request.event())
         );
         if (duplicate != null) {
             return new IngestResult(ApiCode.DUPLICATE_MESSAGE, duplicate.getMessageId(), request.sessionId(), true);
         }
 
         ChatMessage message = new ChatMessage();
-        message.setMessageId(UUID.randomUUID().toString());
+        message.setMessageId(request.messageId());
         message.setSessionId(request.sessionId());
         message.setRole(request.role());
         message.setContent(request.content());
-        message.setClientMessageId(request.clientMessageId());
+        message.setEvent(request.event());
         message.setSeq(nextSeq(request.sessionId()));
         message.setMetadataJson(toJson(request.metadata()));
         chatMessageMapper.insert(message);
