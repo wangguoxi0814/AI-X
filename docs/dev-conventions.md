@@ -1,6 +1,6 @@
 # AI-X 开发基本规范
 
-> 版本：v1.0  
+> 版本：v1.1  
 > 日期：2026-06-13  
 > 适用范围：AI-X 多模块 Java 工程及 `ai-x-ingest` 集成模板
 
@@ -347,6 +347,23 @@ ai-x-ingest/
 | 配置键 | `aix.{域}.{项}` 或 `spring.ai.*` |
 | 日志 | SLF4J；关键路径带 `sessionId` / `messageId` |
 | 注释 | 非显而易见业务规则才写；禁止无意义注释 |
+
+### 7.1 Lombok
+
+全项目已引入 **Lombok**（父 POM `provided` 作用域 + 编译期注解处理），用于减少样板代码。IDE 需安装 Lombok 插件并开启注解处理。
+
+| 场景 | 推荐注解 | 说明 |
+|------|----------|------|
+| MyBatis 实体 | `@Getter` `@Setter` | `BaseEntity` 及子类；**不用 `@Data`**（继承下 `equals`/`hashCode` 易出错） |
+| 不可变 DTO | Java `record` | 优先于 Lombok；如 `CreateSessionRequest`、`IngestProperties` |
+| Service / Component | `@RequiredArgsConstructor` | 构造器注入 `final` 依赖，替代手写构造器 |
+| 日志 | `@Slf4j` | 替代 `LoggerFactory.getLogger` |
+
+**禁止：**
+
+- 在 Entity 上使用 `@Data` 或 `@EqualsAndHashCode` 且不指定 `callSuper`
+- 为已有 `record` DTO 再套 Lombok
+- 在 Lombok 无法清晰表达的复杂构造逻辑上滥用 `@Builder`（领域对象按需使用）
 
 ---
 
