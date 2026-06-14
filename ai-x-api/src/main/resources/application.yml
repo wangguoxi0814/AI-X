@@ -1,6 +1,12 @@
 server:
   port: ${AIX_PORT:8080}
   address: ${AIX_BIND_ADDRESS:127.0.0.1}
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force-request: true
+      force-response: true
 
 spring:
   application:

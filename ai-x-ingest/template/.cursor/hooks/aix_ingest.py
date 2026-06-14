@@ -8,6 +8,7 @@ import json
 import os
 import re
 import sys
+import time
 import traceback
 import urllib.error
 import urllib.request
@@ -109,7 +110,7 @@ def looks_like_utf16_le(raw_bytes: bytes) -> bool:
 
 
 def decode_raw_bytes(raw_bytes: bytes) -> tuple[str, str]:
-    """Return (text, encoding_used). Prefer encodings that yield valid hook JSON."""
+    """Return (text, encoding_used). Cursor Hook JSON is always UTF-8."""
     if not raw_bytes.strip():
         return "", "empty"
 
@@ -120,56 +121,84 @@ def decode_raw_bytes(raw_bytes: bytes) -> tuple[str, str]:
     if raw_bytes.startswith(b"\xef\xbb\xbf"):
         return raw_bytes.decode("utf-8-sig"), "utf-8-sig"
 
-    candidates: list[tuple[str, str]] = []
+    # Hook payload is UTF-8 JSON. Do not try GBK — on CP936 Windows it can
+    # produce parseable JSON with mojibake Chinese (double-encoding).
+    try:
+        text = raw_bytes.decode("utf-8")
+        json.loads(text)
+        return text.strip().lstrip("\ufeff"), "utf-8"
+    except UnicodeDecodeError:
+        pass
+    except json.JSONDecodeError:
+        text = raw_bytes.decode("utf-8", errors="replace").strip().lstrip("\ufeff")
+        if text:
+            return text, "utf-8-replace"
+
     if looks_like_utf16_le(raw_bytes):
-        candidates.append(("utf-16-le", "utf-16-le"))
-    candidates.extend(
-        [
-            ("utf-8", "utf-8"),
-            ("utf-16-le", "utf-16-le"),
-            ("utf-16-be", "utf-16-be"),
-            ("gbk", "gbk"),
-        ]
-    )
+        for encoding, label in (("utf-16-le", "utf-16-le"), ("utf-16-be", "utf-16-be")):
+            try:
+                text = raw_bytes.decode(encoding)
+                json.loads(text)
+                return text.strip().lstrip("\ufeff"), label
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                continue
 
-    seen: set[str] = set()
-    best_text = ""
-    best_encoding = "utf-8-replace"
-    for encoding, label in candidates:
-        if encoding in seen:
-            continue
-        seen.add(encoding)
-        try:
-            text = raw_bytes.decode(encoding)
-        except UnicodeDecodeError:
-            continue
-        try:
-            json.loads(text)
-            return text.strip().lstrip("\ufeff"), label
-        except json.JSONDecodeError:
-            if not best_text:
-                best_text = text
-                best_encoding = label
-
-    if best_text:
-        return best_text.strip().lstrip("\ufeff"), best_encoding
     return raw_bytes.decode("utf-8", errors="replace").strip().lstrip("\ufeff"), "utf-8-replace"
 
 
-def collect_input_bytes() -> bytes:
+def find_windows_hook_payload_file(max_age_seconds: float = 10.0) -> Path | None:
+    """
+    Cursor on Windows writes hook JSON to %TEMP%\\cursor-hook-payload-*.json (UTF-8),
+    then pipes via PowerShell Get-Content without -Encoding UTF8 — stdin is often
+    mojibake on CP936. Read the temp file directly (same source as Hooks UI).
+    """
+    if sys.platform != "win32":
+        return None
+    temp_root = env("TEMP") or env("TMP")
+    if not temp_root:
+        return None
+    temp_dir = Path(temp_root)
+    if not temp_dir.is_dir():
+        return None
+
+    now = time.time()
+    newest: Path | None = None
+    newest_mtime = 0.0
+    for path in temp_dir.glob("cursor-hook-payload-*.json"):
+        try:
+            mtime = path.stat().st_mtime
+        except OSError:
+            continue
+        if now - mtime > max_age_seconds:
+            continue
+        if mtime >= newest_mtime:
+            newest_mtime = mtime
+            newest = path
+    return newest
+
+
+def collect_input_bytes() -> tuple[bytes, str]:
     for arg in sys.argv[1:]:
         path = Path(arg)
         if path.is_file():
-            return path.read_bytes()
+            return path.read_bytes(), "argv"
 
     for env_key in ("CURSOR_HOOK_INPUT", "CURSOR_HOOK_PAYLOAD_PATH"):
         env_path = env(env_key)
         if env_path:
             path = Path(env_path)
             if path.is_file():
-                return path.read_bytes()
+                return path.read_bytes(), "env"
 
-    return sys.stdin.buffer.read()
+    if sys.platform == "win32":
+        payload_path = find_windows_hook_payload_file()
+        if payload_path is not None:
+            try:
+                return payload_path.read_bytes(), "windows_temp_file"
+            except OSError:
+                pass
+
+    return sys.stdin.buffer.read(), "stdin"
 
 
 def scrape_payload_fields(raw: str) -> dict[str, Any]:
@@ -186,16 +215,6 @@ def scrape_payload_fields(raw: str) -> dict[str, Any]:
         match = re.search(pattern, raw)
         if match:
             payload[key] = match.group(1)
-
-    transcript_match = re.search(
-        r'"transcript_path"\s*:\s*"((?:[^"\\]|\\.)*)"',
-        raw,
-    )
-    if transcript_match:
-        try:
-            payload["transcript_path"] = json.loads(f'"{transcript_match.group(1)}"')
-        except json.JSONDecodeError:
-            payload["transcript_path"] = transcript_match.group(1).replace("\\\\", "\\")
 
     return payload
 
@@ -229,12 +248,24 @@ def strip_corrupt_body_field(raw: str, field: str, next_field: str) -> str:
 def parse_payload(raw: str) -> tuple[dict[str, Any], bool]:
     """
     Parse hook JSON. Returns (payload, recovered).
-    recovered=True when stdin JSON was damaged but metadata was salvaged.
+    recovered=True when stdin JSON was damaged but metadata/body was salvaged.
     """
     try:
-        return json.loads(raw), False
+        payload = json.loads(raw)
+        if _payload_body_empty(payload):
+            salvaged = _salvage_body_fields(raw)
+            if salvaged:
+                payload.update(salvaged)
+                return payload, True
+        return payload, False
     except json.JSONDecodeError:
         pass
+
+    salvaged = _salvage_body_fields(raw)
+    if salvaged:
+        payload = scrape_payload_fields(raw)
+        payload.update(salvaged)
+        return payload, True
 
     for field, next_field in (
         ("text", "input_tokens"),
@@ -255,87 +286,36 @@ def parse_payload(raw: str) -> tuple[dict[str, Any], bool]:
         return {}, True
 
 
-def load_transcript(path: Path) -> list[dict[str, Any]]:
-    entries: list[dict[str, Any]] = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line:
+def _payload_body_empty(payload: dict[str, Any]) -> bool:
+    for key in ("prompt", "text", "response", "content"):
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            return False
+    return True
+
+
+def _salvage_body_fields(raw: str) -> dict[str, str]:
+    salvaged: dict[str, str] = {}
+    for field, next_field in (
+        ("prompt", "attachments"),
+        ("prompt", "input_tokens"),
+        ("text", "input_tokens"),
+        ("response", "input_tokens"),
+        ("content", "input_tokens"),
+    ):
+        if field in salvaged:
             continue
-        entries.append(json.loads(line))
-    return entries
-
-
-def message_text(entry: dict[str, Any]) -> str:
-    content = entry.get("message", {}).get("content", [])
-    if not isinstance(content, list):
-        return ""
-    parts: list[str] = []
-    for block in content:
-        if isinstance(block, dict) and block.get("type") == "text":
-            text = block.get("text")
-            if isinstance(text, str) and text:
-                parts.append(text)
-    return "\n".join(parts)
-
-
-def last_message_text(entries: list[dict[str, Any]], role: str) -> str:
-    for entry in reversed(entries):
-        if entry.get("role") == role:
-            text = message_text(entry)
-            if text:
-                return text
-    return ""
-
-
-def last_user_index(entries: list[dict[str, Any]]) -> int:
-    for index in range(len(entries) - 1, -1, -1):
-        if entries[index].get("role") == "user":
-            return index
-    return -1
-
-
-def last_message_text_after(entries: list[dict[str, Any]], role: str, after_index: int) -> str:
-    for entry in reversed(entries[after_index + 1 :]):
-        if entry.get("role") == role:
-            text = message_text(entry)
-            if text:
-                return text
-    return ""
-
-
-def load_transcript_entries(payload: dict[str, Any]) -> list[dict[str, Any]]:
-    transcript_path = payload.get("transcript_path")
-    if not isinstance(transcript_path, str) or not transcript_path:
-        return []
-
-    path = Path(transcript_path)
-    if not path.is_file():
-        write_file_log("warn", "transcript not found", transcriptPath=transcript_path)
-        return []
-
-    try:
-        return load_transcript(path)
-    except (OSError, json.JSONDecodeError) as exc:
-        write_file_log("error", "transcript read failed", error=str(exc), transcriptPath=transcript_path)
-        return []
-
-
-def pick_user_content(
-    payload: dict[str, Any],
-    raw: str,
-    recovered: bool,
-    entries: list[dict[str, Any]],
-) -> tuple[str, str]:
-    """Prefer transcript UTF-8 over hook stdin (often garbled on Windows)."""
-    if entries:
-        text = last_message_text(entries, "user")
+        text = extract_body_field(raw, field, next_field)
         if text.strip():
-            return text, "transcript"
+            salvaged[field] = text
+    return salvaged
 
-    if not recovered:
-        text = user_content(payload)
-        if text.strip():
-            return text, "json"
+
+def pick_user_content(payload: dict[str, Any], raw: str, _recovered: bool) -> tuple[str, str]:
+    """Prefer parsed JSON prompt; fall back to raw extraction when body was damaged."""
+    text = user_content(payload)
+    if text.strip():
+        return text, "json"
 
     for next_field in ("input_tokens", "attachments"):
         text = extract_body_field(raw, "prompt", next_field)
@@ -344,22 +324,10 @@ def pick_user_content(
     return "", "none"
 
 
-def pick_assistant_content(
-    payload: dict[str, Any],
-    raw: str,
-    recovered: bool,
-    entries: list[dict[str, Any]],
-) -> tuple[str, str]:
-    if entries:
-        user_idx = last_user_index(entries)
-        text = last_message_text_after(entries, "assistant", user_idx)
-        if text.strip():
-            return text, "transcript"
-
-    if not recovered:
-        text = assistant_content(payload)
-        if text.strip():
-            return text, "json"
+def pick_assistant_content(payload: dict[str, Any], raw: str, _recovered: bool) -> tuple[str, str]:
+    text = assistant_content(payload)
+    if text.strip():
+        return text, "json"
 
     for field in ("text", "response", "content"):
         text = extract_body_field(raw, field, "input_tokens")
@@ -368,25 +336,20 @@ def pick_assistant_content(
     return "", "none"
 
 
-def enrich_from_transcript(
+def resolve_message_bodies(
     payload: dict[str, Any],
     raw: str = "",
     recovered: bool = False,
 ) -> dict[str, Any]:
-    """
-    Windows: hook stdin JSON text fields are often corrupted.
-    transcript JSONL is reliable UTF-8 — always prefer it for message bodies.
-    """
     event = resolve_event(payload, sys.argv)
-    entries = load_transcript_entries(payload)
 
     if event == "beforeSubmitPrompt":
-        content, source = pick_user_content(payload, raw, recovered, entries)
+        content, source = pick_user_content(payload, raw, recovered)
         if content:
             payload["prompt"] = content
             payload["_content_source"] = source
     elif event == "afterAgentResponse":
-        content, source = pick_assistant_content(payload, raw, recovered, entries)
+        content, source = pick_assistant_content(payload, raw, recovered)
         if content:
             payload["text"] = content
             payload["_content_source"] = source
@@ -394,11 +357,11 @@ def enrich_from_transcript(
     return payload
 
 
-def read_payload() -> tuple[dict[str, Any], dict[str, Any], str, bool, str]:
-    raw_bytes = collect_input_bytes()
+def read_payload() -> tuple[dict[str, Any], dict[str, Any], str, bool, str, str]:
+    raw_bytes, input_source = collect_input_bytes()
     raw, input_encoding = decode_raw_bytes(raw_bytes)
     if not raw:
-        return {}, {}, "", False, input_encoding
+        return {}, {}, "", False, input_encoding, input_source
 
     hook_input, recovered = parse_payload(raw)
     if recovered:
@@ -406,11 +369,12 @@ def read_payload() -> tuple[dict[str, Any], dict[str, Any], str, bool, str]:
             "info",
             "hook JSON recovered from damaged stdin",
             inputEncoding=input_encoding,
+            inputSource=input_source,
             hookEvent=resolve_event(hook_input, sys.argv),
         )
 
-    payload = enrich_from_transcript(dict(hook_input), raw, recovered)
-    return payload, hook_input, raw, recovered, input_encoding
+    payload = resolve_message_bodies(dict(hook_input), raw, recovered)
+    return payload, hook_input, raw, recovered, input_encoding, input_source
 
 
 def resolve_event(payload: dict[str, Any], argv: list[str]) -> str:
@@ -462,9 +426,31 @@ def resolve_message_id(payload: dict[str, Any], content: str, sid: str) -> str:
     return digest
 
 
-def hook_metadata(hook_input: dict[str, Any]) -> dict[str, Any]:
-    """原样保留 Cursor Hook 事件 Input，写入后端 metadata_json。"""
-    return dict(hook_input) if hook_input else {}
+def hook_metadata(hook_input: dict[str, Any], payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    """保留 Hook 元数据；正文只用 resolve 后的 prompt/text，避免 stdin 乱码写入 metadata。"""
+    keep_keys = (
+        "conversation_id",
+        "session_id",
+        "generation_id",
+        "hook_event_name",
+        "model",
+        "composer_mode",
+        "cursor_version",
+        "workspace_roots",
+        "user_email",
+        "attachments",
+    )
+    meta: dict[str, Any] = {}
+    if hook_input:
+        for key in keep_keys:
+            if key in hook_input:
+                meta[key] = hook_input[key]
+    if payload:
+        for key in ("prompt", "text"):
+            value = payload.get(key)
+            if isinstance(value, str) and value:
+                meta[key] = value
+    return meta
 
 
 def ingest_message_body(
@@ -481,7 +467,7 @@ def ingest_message_body(
         "content": content,
         "messageId": resolve_message_id(payload, content, sid),
         "event": hook_event_code(event),
-        "metadata": hook_metadata(hook_input),
+        "metadata": hook_metadata(hook_input, payload),
     }
 
 
@@ -527,7 +513,7 @@ def main() -> int:
         timeout = float(env("AIX_HTTP_TIMEOUT", "3"))
         auto_end = env("AIX_AUTO_END_SESSION", "true").lower() != "false"
 
-        payload, hook_input, _raw, recovered, input_encoding = read_payload()
+        payload, hook_input, raw, recovered, input_encoding, input_source = read_payload()
         event = resolve_event(payload, sys.argv)
         sid = session_id(payload)
 
@@ -536,9 +522,13 @@ def main() -> int:
             "hook start",
             event=event,
             sessionId=sid or None,
+            inputSource=input_source,
             inputEncoding=input_encoding,
             jsonRecovered=recovered,
             generationId=payload.get("generation_id"),
+            contentSource=payload.get("_content_source"),
+            promptPreview=(payload.get("prompt") or "")[:80] or None,
+            textPreview=(payload.get("text") or "")[:80] or None,
         )
 
         if not sid:
@@ -553,16 +543,40 @@ def main() -> int:
                 request_body = {
                     "sessionId": sid,
                     "source": "cursor",
-                    "metadata": hook_metadata(hook_input),
+                    "metadata": hook_metadata(hook_input, payload),
                 }
                 started = post_json(f"{api_base}/api/ingest/sessions", token, request_body, timeout)
             elif event == "beforeSubmitPrompt":
                 content = user_content(payload)
+                if not content.strip():
+                    write_file_log(
+                        "warn",
+                        "skip empty user content",
+                        event=event,
+                        sessionId=sid,
+                        jsonRecovered=recovered,
+                        inputEncoding=input_encoding,
+                        generationId=payload.get("generation_id"),
+                        rawPreview=raw[:300] if raw else None,
+                    )
+                    return 0
                 request_body = ingest_message_body(payload, hook_input, event, sid, "user", content)
                 log_ingest(event, sid, payload, request_body, inputEncoding=input_encoding, jsonRecovered=recovered)
                 started = post_json(f"{api_base}/api/ingest/messages", token, request_body, timeout)
             elif event == "afterAgentResponse":
                 content = assistant_content(payload)
+                if not content.strip():
+                    write_file_log(
+                        "warn",
+                        "skip empty assistant content",
+                        event=event,
+                        sessionId=sid,
+                        jsonRecovered=recovered,
+                        inputEncoding=input_encoding,
+                        generationId=payload.get("generation_id"),
+                        rawPreview=raw[:300] if raw else None,
+                    )
+                    return 0
                 request_body = ingest_message_body(payload, hook_input, event, sid, "assistant", content)
                 log_ingest(event, sid, payload, request_body, inputEncoding=input_encoding, jsonRecovered=recovered)
                 started = post_json(f"{api_base}/api/ingest/messages", token, request_body, timeout)
@@ -603,7 +617,11 @@ def main() -> int:
                 responseBody=body[:500],
             )
             if status >= 400:
-                log_error(f"event={event} sessionId={sid} status={status} body={body[:200]}")
+                log_error(
+                    f"event={event} sessionId={sid} status={status} body={body[:300]} "
+                    f"contentLen={len(request_body.get('content', '')) if request_body else 0} "
+                    f"messageId={request_body.get('messageId') if request_body else None}"
+                )
             elif '"duplicate":true' in body.replace(" ", "").lower():
                 log(f"event={event} sessionId={sid} duplicate messageId+event")
         return 0
