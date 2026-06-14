@@ -261,7 +261,6 @@ ai-x-ingest/
     ├── hooks.json
     └── hooks/
         ├── aix_ingest.py
-        ├── aix-ingest.ps1
         └── README.md
 ```
 
