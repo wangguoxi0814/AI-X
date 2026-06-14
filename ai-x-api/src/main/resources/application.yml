@@ -6,7 +6,7 @@ spring:
   application:
     name: ai-x
   datasource:
-    url: jdbc:mysql://${AIX_MYSQL_HOST:127.0.0.1}:${AIX_MYSQL_PORT:3306}/${AIX_MYSQL_DB:aix}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    url: jdbc:mysql://${AIX_MYSQL_HOST:127.0.0.1}:${AIX_MYSQL_PORT:3306}/${AIX_MYSQL_DB:aix}?useUnicode=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci&serverTimezone=Asia/Shanghai
     username: ${AIX_MYSQL_USER:root}
     password: ${AIX_MYSQL_PASSWORD:root}
     driver-class-name: com.mysql.cj.jdbc.Driver

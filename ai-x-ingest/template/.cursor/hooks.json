@@ -3,25 +3,25 @@
   "hooks": {
     "sessionStart": [
       {
-        "command": ".cursor/hooks/aix-ingest.ps1",
+        "command": "python -u .cursor/hooks/aix_ingest.py",
         "timeout": 3
       }
     ],
     "beforeSubmitPrompt": [
       {
-        "command": ".cursor/hooks/aix-ingest.ps1",
-        "timeout": 3
+        "command": "python -u .cursor/hooks/aix_ingest.py",
+        "timeout": 5
       }
     ],
     "afterAgentResponse": [
       {
-        "command": ".cursor/hooks/aix-ingest.ps1",
-        "timeout": 3
+        "command": "python -u .cursor/hooks/aix_ingest.py",
+        "timeout": 8
       }
     ],
     "stop": [
       {
-        "command": ".cursor/hooks/aix-ingest.ps1",
+        "command": "python -u .cursor/hooks/aix_ingest.py",
         "timeout": 5
       }
     ]
