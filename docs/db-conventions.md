@@ -287,7 +287,7 @@ v1 默认操作人：`0L`（常量 `AuditConstants.SYSTEM_USER_ID`）。
 | 表名 | 实体类 | 业务域 | 说明 |
 |------|--------|--------|------|
 | `chat_session` | `ChatSession` | 对话采集 | AI 对话会话 |
-| `chat_message` | `ChatMessage` | 对话采集 | 会话消息（user/assistant） |
+| `chat_message` | `ChatMessage` | 对话采集 | 会话消息（message_type：见 MessageType 枚举） |
 
 ---
 
