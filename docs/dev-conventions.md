@@ -100,14 +100,14 @@
 
 **命名约定：**
 
-- 表名：业务域前缀 + 蛇形，见 [db-conventions.md](./db-conventions.md) §5（如 `chat_session`）
+- 表名：业务域前缀 + 蛇形，见 [db-conventions.md](./db-conventions.md) §6（如 `chat_session`）
 - 实体：`ChatSession` 对应 `chat_session`，**禁止 `Entity` 后缀**
 - Mapper：`ChatSessionMapper`，与实体同名 + `Mapper`
-- **数据库规范（强制）：** 见 [db-conventions.md](./db-conventions.md) — 审计五字段、全字段 COMMENT、逻辑删除
+- **数据库规范（强制）：** 见 [db-conventions.md](./db-conventions.md) — **UTF-8 / utf8mb4 字符集**、审计五字段、全字段 COMMENT、逻辑删除
 
 **新增表流程：**
 
-1. 按 [db-conventions.md](./db-conventions.md) 编写 DDL（含 COMMENT 与审计字段）
+1. 按 [db-conventions.md](./db-conventions.md) 编写 DDL（含 **utf8mb4 字符集**、COMMENT 与审计字段）
 2. 在 `resources/db/schema.sql`（或迁移脚本）提交
 3. 在 `storage.entity` 新增 `{TablePascalCase} extends BaseEntity`（如 `ChatSession`）
 4. 在 `storage.mapper` 新增 `{Entity}Mapper`
@@ -385,7 +385,7 @@ ai-x-ingest/
 
 **相关文档：**
 
-- [db-conventions.md](./db-conventions.md) — 数据库表结构、审计字段、COMMENT 规范
+- [db-conventions.md](./db-conventions.md) — 数据库表结构、**utf8mb4 字符集**、审计字段、COMMENT 规范
 - [requirements.md](./requirements.md) — 功能与非功能需求
 - [cursor-hooks-tech-options.md](./cursor-hooks-tech-options.md) — Hooks 采集方案
 - [project_docs.md](./project_docs.md) — 技术沉淀

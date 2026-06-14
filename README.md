@@ -156,7 +156,7 @@ $env:AIX_INGEST_TOKEN = "your-token"
 
 | 文档 | 内容 |
 |------|------|
-| [docs/db-conventions.md](docs/db-conventions.md) | **数据库规范**：审计字段、COMMENT、逻辑删除 |
+| [docs/db-conventions.md](docs/db-conventions.md) | **数据库规范**：utf8mb4 字符集、审计字段、COMMENT、逻辑删除 |
 | [docs/dev-conventions.md](docs/dev-conventions.md) | **开发规范**：模块职责、代码存放位置、依赖规则 |
 | [docs/requirements.md](docs/requirements.md) | 功能需求、数据模型、Spring AI 架构、里程碑 |
 | [docs/cursor-hooks-tech-options.md](docs/cursor-hooks-tech-options.md) | Cursor Hooks 采集方案、REST API、部署与联调 |
