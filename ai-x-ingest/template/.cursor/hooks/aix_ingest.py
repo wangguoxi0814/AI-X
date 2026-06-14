@@ -42,6 +42,12 @@ HOOK_EVENT_CODES: dict[str, int] = {
     "workspaceOpen": 21,
 }
 
+# 与 com.aix.common.model.MessageType 的 code 保持一致
+MESSAGE_TYPE_USER = 1
+MESSAGE_TYPE_ASSISTANT = 2
+MESSAGE_TYPE_THOUGHT = 3
+MESSAGE_TYPE_SYSTEM = 4
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 LOG_DIR = SCRIPT_DIR / "logs"
 
@@ -336,6 +342,11 @@ def pick_assistant_content(payload: dict[str, Any], raw: str, _recovered: bool) 
     return "", "none"
 
 
+def pick_thought_content(payload: dict[str, Any], raw: str, recovered: bool) -> tuple[str, str]:
+    """afterAgentThought uses the same `text` field as assistant output."""
+    return pick_assistant_content(payload, raw, recovered)
+
+
 def resolve_message_bodies(
     payload: dict[str, Any],
     raw: str = "",
@@ -350,6 +361,11 @@ def resolve_message_bodies(
             payload["_content_source"] = source
     elif event == "afterAgentResponse":
         content, source = pick_assistant_content(payload, raw, recovered)
+        if content:
+            payload["text"] = content
+            payload["_content_source"] = source
+    elif event == "afterAgentThought":
+        content, source = pick_thought_content(payload, raw, recovered)
         if content:
             payload["text"] = content
             payload["_content_source"] = source
@@ -386,8 +402,13 @@ def resolve_event(payload: dict[str, Any], argv: list[str]) -> str:
             return value
     if payload.get("prompt") is not None:
         return "beforeSubmitPrompt"
-    if payload.get("response") is not None or payload.get("text") is not None:
+    if payload.get("response") is not None or (
+        payload.get("text") is not None
+        and payload.get("hook_event_name") != "afterAgentThought"
+    ):
         return "afterAgentResponse"
+    if payload.get("text") is not None:
+        return "afterAgentThought"
     if payload.get("status") is not None and session_id(payload):
         return "stop"
     if session_id(payload):
@@ -408,6 +429,11 @@ def user_content(payload: dict[str, Any]) -> str:
     return value if isinstance(value, str) else ""
 
 
+def thought_content(payload: dict[str, Any]) -> str:
+    value = payload.get("text")
+    return value if isinstance(value, str) else ""
+
+
 def assistant_content(payload: dict[str, Any]) -> str:
     for key in ("text", "response", "content"):
         value = payload.get(key)
@@ -416,8 +442,17 @@ def assistant_content(payload: dict[str, Any]) -> str:
     return ""
 
 
-def resolve_message_id(payload: dict[str, Any], content: str, sid: str) -> str:
+def resolve_message_id(payload: dict[str, Any], content: str, sid: str, event: str = "") -> str:
     """Cursor generation_id; same turn shares id, distinguished by event code."""
+    if event == "afterAgentThought" and content.strip():
+        gen = ""
+        for key in ("generation_id", "message_id", "messageId", "clientMessageId"):
+            value = payload.get(key)
+            if isinstance(value, str) and value:
+                gen = value
+                break
+        digest = hashlib.sha256(f"{gen}|thought|{content}".encode("utf-8")).hexdigest()[:32]
+        return digest
     for key in ("generation_id", "message_id", "messageId", "clientMessageId"):
         value = payload.get(key)
         if isinstance(value, str) and value:
@@ -439,6 +474,7 @@ def hook_metadata(hook_input: dict[str, Any], payload: dict[str, Any] | None = N
         "workspace_roots",
         "user_email",
         "attachments",
+        "duration_ms",
     )
     meta: dict[str, Any] = {}
     if hook_input:
@@ -458,14 +494,14 @@ def ingest_message_body(
     hook_input: dict[str, Any],
     event: str,
     sid: str,
-    role: str,
+    message_type: int,
     content: str,
 ) -> dict[str, Any]:
     return {
         "sessionId": sid,
-        "role": role,
+        "messageType": message_type,
         "content": content,
-        "messageId": resolve_message_id(payload, content, sid),
+        "messageId": resolve_message_id(payload, content, sid, event),
         "event": hook_event_code(event),
         "metadata": hook_metadata(hook_input, payload),
     }
@@ -496,7 +532,7 @@ def log_ingest(event: str, sid: str, payload: dict[str, Any], body: dict[str, An
         sessionId=sid,
         messageId=body.get("messageId") if body else None,
         eventCode=body.get("event") if body else None,
-        role=body.get("role") if body else None,
+        messageType=body.get("messageType") if body else None,
         contentSource=payload.get("_content_source"),
         contentLength=len(content),
         contentPreview=content[:200],
@@ -560,7 +596,9 @@ def main() -> int:
                         rawPreview=raw[:300] if raw else None,
                     )
                     return 0
-                request_body = ingest_message_body(payload, hook_input, event, sid, "user", content)
+                request_body = ingest_message_body(
+                    payload, hook_input, event, sid, MESSAGE_TYPE_USER, content
+                )
                 log_ingest(event, sid, payload, request_body, inputEncoding=input_encoding, jsonRecovered=recovered)
                 started = post_json(f"{api_base}/api/ingest/messages", token, request_body, timeout)
             elif event == "afterAgentResponse":
@@ -577,12 +615,30 @@ def main() -> int:
                         rawPreview=raw[:300] if raw else None,
                     )
                     return 0
-                request_body = ingest_message_body(payload, hook_input, event, sid, "assistant", content)
+                request_body = ingest_message_body(
+                    payload, hook_input, event, sid, MESSAGE_TYPE_ASSISTANT, content
+                )
                 log_ingest(event, sid, payload, request_body, inputEncoding=input_encoding, jsonRecovered=recovered)
                 started = post_json(f"{api_base}/api/ingest/messages", token, request_body, timeout)
             elif event == "afterAgentThought":
-                write_file_log("info", "skip afterAgentThought", sessionId=sid)
-                return 0
+                content = thought_content(payload)
+                if not content.strip():
+                    write_file_log(
+                        "warn",
+                        "skip empty thought content",
+                        event=event,
+                        sessionId=sid,
+                        jsonRecovered=recovered,
+                        inputEncoding=input_encoding,
+                        generationId=payload.get("generation_id"),
+                        rawPreview=raw[:300] if raw else None,
+                    )
+                    return 0
+                request_body = ingest_message_body(
+                    payload, hook_input, event, sid, MESSAGE_TYPE_THOUGHT, content
+                )
+                log_ingest(event, sid, payload, request_body, inputEncoding=input_encoding, jsonRecovered=recovered)
+                started = post_json(f"{api_base}/api/ingest/messages", token, request_body, timeout)
             elif event == "stop":
                 if auto_end:
                     started = post_json(

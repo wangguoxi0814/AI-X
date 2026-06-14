@@ -19,6 +19,12 @@
         "timeout": 8
       }
     ],
+    "afterAgentThought": [
+      {
+        "command": "python -u .cursor/hooks/aix_ingest.py",
+        "timeout": 8
+      }
+    ],
     "stop": [
       {
         "command": "python -u .cursor/hooks/aix_ingest.py",
