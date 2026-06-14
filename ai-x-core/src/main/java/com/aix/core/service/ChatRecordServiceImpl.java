@@ -13,8 +13,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -24,22 +24,14 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class ChatRecordServiceImpl implements ChatRecordService {
-
-    private static final Logger log = LoggerFactory.getLogger(ChatRecordServiceImpl.class);
 
     private final ChatSessionMapper chatSessionMapper;
     private final ChatMessageMapper chatMessageMapper;
     private final ObjectMapper objectMapper;
-
-    public ChatRecordServiceImpl(ChatSessionMapper chatSessionMapper,
-                                 ChatMessageMapper chatMessageMapper,
-                                 ObjectMapper objectMapper) {
-        this.chatSessionMapper = chatSessionMapper;
-        this.chatMessageMapper = chatMessageMapper;
-        this.objectMapper = objectMapper;
-    }
 
     @Override
     @Transactional
