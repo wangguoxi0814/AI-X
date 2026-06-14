@@ -10,23 +10,29 @@ import java.util.stream.Collectors;
  */
 public enum MessageType {
 
-    UNKNOWN(0),
-    USER(1),
-    ASSISTANT(2),
-    THOUGHT(3),
-    SYSTEM(4);
+    UNKNOWN(0, "未知类型"),
+    USER(1, "用户消息"),
+    ASSISTANT(2, "助手回复"),
+    THOUGHT(3, "Agent 思考"),
+    SYSTEM(4, "系统消息");
 
     private static final Map<Integer, MessageType> BY_CODE = Arrays.stream(values())
             .collect(Collectors.toMap(MessageType::getCode, Function.identity()));
 
     private final int code;
+    private final String description;
 
-    MessageType(int code) {
+    MessageType(int code, String description) {
         this.code = code;
+        this.description = description;
     }
 
     public int getCode() {
         return code;
+    }
+
+    public String getDescription() {
+        return description;
     }
 
     public static MessageType fromCode(Integer code) {
