@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS chat_message (
     id                BIGINT        NOT NULL COMMENT '主键ID（雪花ID）',
     message_id        VARCHAR(128)  NOT NULL COMMENT '客户端消息ID',
     session_id        VARCHAR(64)   NOT NULL COMMENT '所属会话ID',
-    role              VARCHAR(16)   NOT NULL COMMENT '角色：user/assistant/system',
+    message_type      INT           NOT NULL COMMENT '消息类型',
     content           MEDIUMTEXT    NOT NULL COMMENT '消息正文',
     seq               INT           NOT NULL COMMENT '会话内顺序号，从 1 递增',
     event             INT           NOT NULL COMMENT 'Hook 事件码',
