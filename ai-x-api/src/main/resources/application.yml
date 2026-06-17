@@ -16,6 +16,23 @@ spring:
     username: ${AIX_MYSQL_USER:root}
     password: ${AIX_MYSQL_PASSWORD:root}
     driver-class-name: com.mysql.cj.jdbc.Driver
+  ai:
+    chat:
+      model: openai
+      embedding: openai
+    openai:
+      api-key: ${DASHSCOPE_API_KEY}
+      base-url: https://dashscope.aliyuncs.com/compatible-mode
+      chat:
+        options:
+          model: qwen-plus
+          temperature: 0.7
+          max-tokens: 2048
+
+      embedding:
+        options:
+          model: text-embedding-v4
+          dimensions: 1024 # 需与模型支持维度、Milvus一致
 
 mybatis-plus:
   configuration:
