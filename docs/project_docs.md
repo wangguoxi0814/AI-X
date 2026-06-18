@@ -38,6 +38,8 @@
 - **模块化分层**：MCP 入口、领域服务、存储（MySQL）、RAG（`ai-x-rag` / Spring AI）、分析拆为独立模块；模型与向量库通过 Spring AI Starter 可插拔切换。
 - **持久层约定**：使用 MyBatis-Plus 时，实体字段通过 `@TableField` 映射，框架默认驼峰转下划线；业务 ID 与 Milvus 中的 externalId 需双向关联。
 - **可观测性基线**：结构化日志携带 traceId、sessionId；暴露写入 QPS、embedding 队列深度、RAG retrieve/rerank P95 等指标及健康检查端点。
+- **LLM 组件测试分层**：ChatClient 等 AI 组件宜分三层——（1）纯单元测试用 `ChatClient.builder(mockChatModel)` 验证 prompt 链路与响应解析，无 Spring、无网络；（2）`@SpringBootTest` + `@MockBean ChatModel` 验证 Bean 装配与 defaultSystem 等配置，避免真实 API 费用；（3）联调测试用 `@EnabledIfEnvironmentVariable` 按环境变量门控，仅在具备 API Key 与基础设施时执行。同步调用链为 `.prompt().user(...).call().content()`，流式为 `.stream().content()`。
+- **Spring 测试上下文裁剪**：测单个 AI Bean 时不宜 `@SpringBootTest` 加载完整 `@SpringBootApplication`，否则会连带初始化 DataSource、Milvus、OpenAI 等外部依赖导致 `Failed to load ApplicationContext`。应单独定义 `@SpringBootConfiguration` + `@EnableAutoConfiguration(exclude = {...})` 仅 `@Import` 被测配置类，集成测试用 `@MockBean` 替换 `ChatModel`，联调再按需放开 OpenAI 自动配置。
 
 ## 安全与部署
 
@@ -46,4 +48,4 @@
 
 ---
 
-*最后更新：2026-06-13*
+*最后更新：2026-06-18*
