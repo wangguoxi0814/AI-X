@@ -1,12 +1,13 @@
-package com.aix.core.service;
+package com.aix.core.service.chat.impl;
 
 import com.aix.common.exception.AixException;
 import com.aix.common.model.ApiCode;
 import com.aix.common.model.CursorHookEvent;
 import com.aix.common.model.MessageType;
-import com.aix.core.dto.CreateSessionRequest;
-import com.aix.core.dto.IngestResult;
-import com.aix.core.dto.RecordMessageRequest;
+import com.aix.core.dto.chat.CreateSessionRequest;
+import com.aix.core.dto.chat.IngestResult;
+import com.aix.core.dto.chat.RecordMessageRequest;
+import com.aix.core.service.chat.ChatRecordService;
 import com.aix.storage.entity.ChatMessage;
 import com.aix.storage.entity.ChatSession;
 import com.aix.storage.mapper.ChatMessageMapper;

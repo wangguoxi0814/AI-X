@@ -1,4 +1,4 @@
-package com.aix.core.dto;
+package com.aix.core.dto.chat;
 
 import com.aix.common.model.ApiCode;
 

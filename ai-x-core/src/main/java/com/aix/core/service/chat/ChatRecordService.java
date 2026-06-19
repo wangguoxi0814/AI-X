@@ -1,8 +1,8 @@
-package com.aix.core.service;
+package com.aix.core.service.chat;
 
-import com.aix.core.dto.CreateSessionRequest;
-import com.aix.core.dto.IngestResult;
-import com.aix.core.dto.RecordMessageRequest;
+import com.aix.core.dto.chat.CreateSessionRequest;
+import com.aix.core.dto.chat.IngestResult;
+import com.aix.core.dto.chat.RecordMessageRequest;
 
 public interface ChatRecordService {
 

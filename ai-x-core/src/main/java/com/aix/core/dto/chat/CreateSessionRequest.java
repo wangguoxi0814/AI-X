@@ -1,4 +1,4 @@
-package com.aix.core.dto;
+package com.aix.core.dto.chat;
 
 import java.util.List;
 import java.util.Map;
