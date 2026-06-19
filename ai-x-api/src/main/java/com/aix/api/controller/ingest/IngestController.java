@@ -1,10 +1,9 @@
 package com.aix.api.controller.ingest;
 
-import com.aix.common.model.ApiCode;
-import com.aix.core.dto.CreateSessionRequest;
-import com.aix.core.dto.IngestResult;
-import com.aix.core.dto.RecordMessageRequest;
-import com.aix.core.service.ChatRecordService;
+import com.aix.core.dto.chat.CreateSessionRequest;
+import com.aix.core.dto.chat.IngestResult;
+import com.aix.core.dto.chat.RecordMessageRequest;
+import com.aix.core.service.chat.ChatRecordService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
