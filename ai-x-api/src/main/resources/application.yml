@@ -44,6 +44,7 @@ spring:
         embeddingDimension: 1024
         indexType: IVF_FLAT
         metricType: COSINE
+        initializeSchema: true
 
 
 
