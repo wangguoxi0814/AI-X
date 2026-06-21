@@ -13,5 +13,5 @@ public interface RagService {
 
     List<Document> search(RagSearchDTO ragSearchDTO);
 
-    String delete(@NotNull List<String> messageIdList);
+    String delete(List<String> messageIdList);
 }

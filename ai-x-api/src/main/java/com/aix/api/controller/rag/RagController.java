@@ -40,7 +40,7 @@ public class RagController {
     }
 
     @DeleteMapping("/embedding/delete")
-    public String delete(@Valid @RequestBody List<String> messageIdList) {
+    public String delete(@RequestBody @NotEmpty List<String> messageIdList) {
         return ragService.delete(messageIdList);
     }
 }
