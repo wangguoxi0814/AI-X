@@ -6,11 +6,13 @@ import com.aix.rag.service.RagService;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 import org.springframework.util.StreamUtils;
 
 import java.util.ArrayList;
 import java.util.List;
 
+@Service
 public class RagServiceImpl implements RagService {
 
     @Autowired
